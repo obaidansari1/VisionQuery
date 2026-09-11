@@ -1,26 +1,33 @@
-# Python
-venv/
-__pycache__/
-*.pyc
-
-# Environment / secrets
+# Environment files and secrets
 .env
+.env.*
+!.env.example
+!*.env.example
 
-# Django
-db.sqlite3
+# Python / Django
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3
+backend/media/
+debug_frames/
 
-# Uploaded/generated media
-media/
+# Frontend dependencies and build output
+node_modules/
+.next/
+dist/
+build/
+coverage/
+*.tsbuildinfo
 
-# IDE
+# Editor and operating-system files
 .vscode/
-
-# OS
+.idea/
 .DS_Store
 Thumbs.db
 
-# Video/debug/generated files
-debug_frames/
+# Local video and debugging assets
 *.mp4
 *.avi
 *.mov
