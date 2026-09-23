@@ -1,0 +1,27 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Environment / secrets
+.env
+
+# Django
+db.sqlite3
+
+# Uploaded/generated media
+media/
+
+# IDE
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Video/debug/generated files
+debug_frames/
+*.mp4
+*.avi
+*.mov
+*.mkv

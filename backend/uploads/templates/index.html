@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VisionQuery — Search Video by Events</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e6e8ec;
+    --muted: #9aa2b1;
+    --accent: #6ea8fe;
+    --accent-2: #7ee2b8;
+    --danger: #ff6b6b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: 0.2px; }
+  header span { color: var(--muted); font-size: 13px; }
+  main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 20px;
+    padding: 24px 28px 48px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .panel + .panel { margin-top: 20px; }
+  h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+  select, input[type="text"] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+  input[type="file"] { color: var(--muted); font-size: 13px; width: 100%; }
+  button {
+    background: var(--accent);
+    color: #0b0e13;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .row { display: flex; gap: 10px; margin-top: 12px; }
+  .row > * { flex: 1; }
+  .badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 3px 9px;
+    border-radius: 100px;
+  }
+  .badge.pending, .badge.processing { background: #3a2f0b; color: #f0c34a; }
+  .badge.done { background: #123924; color: var(--accent-2); }
+  .badge.failed { background: #3a1414; color: var(--danger); }
+  .status-line { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 13px; color: var(--muted); }
+  video { width: 100%; border-radius: var(--radius); background: #000; display: block; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 14px;
+    margin-top: 16px;
+  }
+  .result-card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .result-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .result-card img { width: 100%; height: 90px; object-fit: cover; display: block; }
+  .result-meta { padding: 8px 10px; }
+  .result-time { font-size: 13px; font-weight: 700; }
+  .result-score-bar {
+    height: 4px; border-radius: 2px; background: #2a2f3a; margin-top: 6px; overflow: hidden;
+  }
+  .result-score-fill { height: 100%; background: var(--accent-2); }
+  .result-tag { font-size: 10px; color: var(--muted); text-transform: uppercase; margin-top: 4px; }
+  .empty-state { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+  .error-text { color: var(--danger); font-size: 13px; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>VisionQuery</h1>
+  <span>Search inside video by describing what happens</span>
+</header>
+
+<main>
+  <div>
+    <div class="panel">
+      <h2>1 &middot; Upload a clip</h2>
+      <input type="file" id="fileInput" accept="video/*" />
+      <div class="row">
+        <button id="uploadBtn">Upload &amp; process</button>
+      </div>
+      <div class="status-line" id="uploadStatusLine" style="display:none;">
+        <span class="badge" id="statusBadge">pending</span>
+        <span id="statusText"></span>
+      </div>
+      <p class="hint">Short clips (10&ndash;30s) work best for a live demo &mdash; sampling and CLIP embedding run on CPU.</p>
+      <div class="error-text" id="uploadError"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Recent uploads</h2>
+      <select id="videoSelect"></select>
+      <div class="row">
+        <button class="secondary" id="refreshVideosBtn">Refresh</button>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <h2>2 &middot; Video</h2>
+      <video id="player" controls></video>
+      <p class="hint" id="frameCountHint"></p>
+    </div>
+
+    <div class="panel">
+      <h2>3 &middot; Search by event</h2>
+      <input type="text" id="queryInput" placeholder="e.g. person picks up a bag" />
+      <div class="row">
+        <button id="searchBtn">Search</button>
+      </div>
+      <div class="error-text" id="searchError"></div>
+      <div id="resultsGrid" class="results-grid"></div>
+      <div class="empty-state" id="emptyState">Process a video, then search for a moment.</div>
+    </div>
+  </div>
+</main>
+
+<script>
+const state = { videoId: null, pollTimer: null };
+
+const el = (id) => document.getElementById(id);
+const player = el("player");
+
+async function api(path, options) {
+  const res = await fetch(path, options);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try { detail = JSON.stringify(await res.json()); } catch (e) {}
+    throw new Error(`${res.status}: ${detail}`);
+  }
+  return res.json();
+}
+
+function setBadge(status) {
+  const badge = el("statusBadge");
+  badge.textContent = status;
+  badge.className = "badge " + status;
+}
+
+function fmtTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+async function loadVideos(selectId) {
+  const data = await api("/api/videos/");
+  const select = el("videoSelect");
+  select.innerHTML = "";
+  data.forEach((v) => {
+    const opt = document.createElement("option");
+    opt.value = v.video_id;
+    opt.textContent = `#${v.video_id} — ${v.status} — ${v.frame_count} frames (${new Date(v.uploaded_at).toLocaleString()})`;
+    select.appendChild(opt);
+  });
+  if (selectId) {
+    select.value = selectId;
+  }
+  if (select.value) {
+    selectVideo(parseInt(select.value, 10));
+  }
+}
+
+async function selectVideo(videoId) {
+  state.videoId = videoId;
+  const data = await api(`/api/status/${videoId}/`);
+  applyStatus(data);
+  if (data.file_url) {
+    player.src = data.file_url;
+  }
+}
+
+function applyStatus(data) {
+  el("uploadStatusLine").style.display = "flex";
+  setBadge(data.status);
+  el("statusText").textContent = `video #${data.video_id}`;
+  el("frameCountHint").textContent = data.frame_count
+    ? `${data.frame_count} frames indexed for search`
+    : "No frames indexed yet";
+  el("searchBtn").disabled = data.status !== "done";
+}
+
+function pollStatus(videoId) {
+  if (state.pollTimer) clearInterval(state.pollTimer);
+  state.pollTimer = setInterval(async () => {
+    try {
+      const data = await api(`/api/status/${videoId}/`);
+      applyStatus(data);
+      if (data.status === "done" || data.status === "failed") {
+        clearInterval(state.pollTimer);
+        if (data.status === "done" && data.file_url) {
+          player.src = data.file_url;
+        }
+        loadVideos(videoId);
+      }
+    } catch (e) {
+      clearInterval(state.pollTimer);
+      el("uploadError").textContent = e.message;
+    }
+  }, 1500);
+}
+
+el("uploadBtn").addEventListener("click", async () => {
+  const file = el("fileInput").files[0];
+  el("uploadError").textContent = "";
+  if (!file) {
+    el("uploadError").textContent = "Choose a video file first.";
+    return;
+  }
+  const form = new FormData();
+  form.append("file", file);
+  el("uploadBtn").disabled = true;
+  try {
+    const data = await api("/api/upload/", { method: "POST", body: form });
+    state.videoId = data.video_id;
+    el("uploadStatusLine").style.display = "flex";
+    setBadge("pending");
+    el("statusText").textContent = `video #${data.video_id}`;
+    el("searchBtn").disabled = true;
+    pollStatus(data.video_id);
+  } catch (e) {
+    el("uploadError").textContent = e.message;
+  } finally {
+    el("uploadBtn").disabled = false;
+  }
+});
+
+el("refreshVideosBtn").addEventListener("click", () => loadVideos(state.videoId));
+el("videoSelect").addEventListener("change", (e) => selectVideo(parseInt(e.target.value, 10)));
+
+el("searchBtn").addEventListener("click", runSearch);
+el("queryInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") runSearch();
+});
+
+async function runSearch() {
+  const query = el("queryInput").value.trim();
+  el("searchError").textContent = "";
+  if (!query) return;
+  if (!state.videoId) {
+    el("searchError").textContent = "Select a processed video first.";
+    return;
+  }
+  el("searchBtn").disabled = true;
+  try {
+    const data = await api("/api/search/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, video_id: state.videoId, top_k: 10 }),
+    });
+    renderResults(data.results);
+  } catch (e) {
+    el("searchError").textContent = e.message;
+  } finally {
+    el("searchBtn").disabled = false;
+  }
+}
+
+function renderResults(results) {
+  const grid = el("resultsGrid");
+  grid.innerHTML = "";
+  el("emptyState").style.display = results.length ? "none" : "block";
+  results.forEach((r) => {
+    const card = document.createElement("div");
+    card.className = "result-card";
+    const scorePct = Math.max(0, Math.min(100, Math.round((r.score || 0) * 100)));
+    card.innerHTML = `
+      <img src="${r.image_url}" alt="frame at ${fmtTime(r.timestamp_seconds)}" />
+      <div class="result-meta">
+        <div class="result-time">${fmtTime(r.timestamp_seconds)}</div>
+        <div class="result-score-bar"><div class="result-score-fill" style="width:${scorePct}%"></div></div>
+        <div class="result-tag">${r.sample_type} &middot; ${scorePct}% match</div>
+      </div>
+    `;
+    card.addEventListener("click", () => {
+      player.currentTime = r.timestamp_seconds;
+      player.play();
+    });
+    grid.appendChild(card);
+  });
+}
+
+el("searchBtn").disabled = true;
+loadVideos();
+</script>
+
+</body>
+</html>
